@@ -449,7 +449,7 @@ export default function App() {
                     >
                       {/* Left hovering expansion bubble */}
                       <div className="absolute right-8 px-3 py-1 border border-[#c6b89e]/30 bg-black/95 text-white text-[8px] font-mono tracking-[3px] uppercase opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap translate-x-1.5 group-hover:translate-x-0 shadow-lg">
-                        {item.num} // {item.label} (Manifesto) {isActive ? "[ ACTIVE ]" : ""}
+                        {item.num} // {item.label} ({item.hover}) {isActive ? "[ ACTIVE ]" : ""}
                       </div>
 
                       <div className="w-4 h-4 flex items-center justify-center relative">
