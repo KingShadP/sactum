@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowUpRight, Cpu, HelpCircle, Thermometer, Radio, Menu, X, Landmark, Compass, Droplet, ShieldAlert, Sparkles } from "lucide-react";
+import { Radio } from "lucide-react";
 import ScrambleText from "./components/ScrambleText";
 import AudioPlayer from "./components/AudioPlayer";
 import AcquisitionGrid from "./components/AcquisitionGrid";
@@ -15,7 +15,6 @@ import AIChatbox from "./components/AIChatbox";
 import ScribeNotes from "./components/ScribeNotes";
 import SatelliteRadar from "./components/SatelliteRadar";
 import VirtualKingdomStage from "./components/VirtualKingdomStage";
-import SanctuaryAmbient from "./components/SanctuaryAmbient";
 import Tooltip from "./components/Tooltip";
 import TelemetryTerminal from "./components/TelemetryTerminal";
 import HomeSection from "./components/HomeSection";
@@ -35,6 +34,11 @@ const SECTION_SELECTORS: Record<TabState, string> = {
   lore: "section-lore",
   community: "section-community"
 };
+
+// Reverse lookup: sectionId → TabState
+const SECTION_ID_TO_TAB: Record<string, TabState> = Object.fromEntries(
+  Object.entries(SECTION_SELECTORS).map(([tab, sectionId]) => [sectionId, tab as TabState])
+);
 
 const ARCHIVE_LORE_LOOKUP: Record<string, { title: string; subtitle: string; era: string; desc: string }> = {
   "chap-01": {
@@ -57,6 +61,23 @@ const ARCHIVE_LORE_LOOKUP: Record<string, { title: string; subtitle: string; era
   }
 };
 
+// Static nav tab data shared between desktop header, mobile drawer, and side HUD nav
+const NAV_TABS: {
+  id: TabState;
+  num: string;
+  label: string;
+  hover: string;
+  diag: string;
+  diagType: "SYSTEM" | "FORGE_SYNC";
+}[] = [
+  { id: "home",      num: "01", label: "HOME",      hover: "MANIFESTO",  diagType: "SYSTEM",     diag: "🛡️ [GATEWAY] Live biometric trace aligned... Main Atrium credentials set to Sovereign level." },
+  { id: "listen",    num: "02", label: "LISTEN",    hover: "FREQUENCY",  diagType: "FORGE_SYNC", diag: "🎵 [FREQUENCY] Buffers engaged. Active list of sound channels ready. Checking hardware synth." },
+  { id: "vault",     num: "03", label: "VAULT",     hover: "CATALOG",    diagType: "SYSTEM",     diag: "🗄️ [VAULT] Tracking streams: 395 SoundCloud believers, 5.77K Audiomack manifests secured." },
+  { id: "artifacts", num: "04", label: "ARTIFACTS", hover: "UNIFORMS",   diagType: "FORGE_SYNC", diag: "👕 [ITEMS] Artifact drop inventory: ARMORED LS (25 total units), CIPHER VEST (custom geometry)." },
+  { id: "lore",      num: "05", label: "LORE",      hover: "MYTHOLOGY",  diagType: "SYSTEM",     diag: "📖 [THEOLOGY] Parsing character god-complex briefs and Miami roots archive timeline." },
+  { id: "community", num: "06", label: "COMMUNITY", hover: "BELIEVERS",  diagType: "SYSTEM",     diag: "👥 [BELIEVERS] Accessing VIP email registry, live social outlets, FAQs, and event schedules." },
+];
+
 const SHIELD = 'aesthetic check';
 
 export default function App() {
@@ -75,21 +96,23 @@ export default function App() {
     }
   });
 
-  const toggleParadoxMode = () => {
-    const next = !paradoxMode;
-    setParadoxMode(next);
-    try {
-      localStorage.setItem("kingshadp-paradox-mode", String(next));
-    } catch (e) {}
-    window.dispatchEvent(new CustomEvent("telemetry-log", {
-      detail: { 
-        message: next 
-          ? "⚠️ SYS_MUTATION: Mutated timeline. OMEGA anti-matter void initialized. Shifted to the Parallel Universe." 
-          : "✓ SYS_NOMINAL: Timeline restored. ALPHA golden physical core active.", 
-        type: next ? "WARNING" : "SYSTEM" 
-      }
-    }));
-  };
+  const toggleParadoxMode = useCallback(() => {
+    setParadoxMode((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("kingshadp-paradox-mode", String(next));
+      } catch {}
+      window.dispatchEvent(new CustomEvent("telemetry-log", {
+        detail: {
+          message: next
+            ? "⚠️ SYS_MUTATION: Mutated timeline. OMEGA anti-matter void initialized. Shifted to the Parallel Universe."
+            : "✓ SYS_NOMINAL: Timeline restored. ALPHA golden physical core active.",
+          type: next ? "WARNING" : "SYSTEM"
+        }
+      }));
+      return next;
+    });
+  }, []);
 
   // Scroll dynamics parameters for 4D HUD acceleration tracker
   const [scrollSpeed, setScrollSpeed] = useState(0);
@@ -110,24 +133,26 @@ export default function App() {
   const [archiveTab, setArchiveTab] = useState<"global" | "saved">("global");
   const [bookmarkedLoreIds, setBookmarkedLoreIds] = useState<string[]>([]);
 
-  const syncBookmarks = () => {
+  const syncBookmarks = useCallback(() => {
     try {
       const saved = localStorage.getItem("kingshadp-bookmarked-lore");
       setBookmarkedLoreIds(saved ? JSON.parse(saved) : []);
-    } catch (e) {
+    } catch {
       setBookmarkedLoreIds([]);
     }
-  };
+  }, []);
 
-  const removeBookmarkFromArchive = (id: string) => {
-    const next = bookmarkedLoreIds.filter((item) => item !== id);
-    setBookmarkedLoreIds(next);
-    localStorage.setItem("kingshadp-bookmarked-lore", JSON.stringify(next));
+  const removeBookmarkFromArchive = useCallback((id: string) => {
+    setBookmarkedLoreIds((prev) => {
+      const next = prev.filter((item) => item !== id);
+      localStorage.setItem("kingshadp-bookmarked-lore", JSON.stringify(next));
+      return next;
+    });
     window.dispatchEvent(new Event("lore-bookmarks-updated"));
     window.dispatchEvent(new CustomEvent("telemetry-log", {
       detail: { message: `LORE_REGISTRY: Evicted dossier from within Archive systems dashboard.`, type: "WARNING" }
     }));
-  };
+  }, []);
 
   useEffect(() => {
     syncBookmarks();
@@ -141,7 +166,7 @@ export default function App() {
   useEffect(() => {
     if (!accessGranted) return;
     let lastScrollY = window.scrollY;
-    let timeoutId: any = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
@@ -174,28 +199,17 @@ export default function App() {
     };
   }, [accessGranted, activeTab]);
 
-  const scrollToSection = (sectionId: string) => {
-    const tabMap: Record<string, TabState> = {
-      "section-home": "home",
-      "section-listen": "listen",
-      "section-vault": "vault",
-      "section-artifacts": "artifacts",
-      "section-lore": "lore",
-      "section-community": "community",
-      "home": "home",
-      "listen": "listen",
-      "vault": "vault",
-      "artifacts": "artifacts",
-      "lore": "lore",
-      "community": "community"
-    };
-    const targetTab = tabMap[sectionId] || "home";
+  const scrollToSection = useCallback((sectionId: string) => {
+    // Support both "section-home" and bare "home" id formats
+    const targetTab =
+      SECTION_ID_TO_TAB[sectionId] ??
+      (SECTIONS_ORDER.includes(sectionId as TabState) ? (sectionId as TabState) : "home");
     setActiveTab(targetTab);
-    
+
     // Smooth transitions between distinct page coordinates while automatically recovering scrolling bounds
-    window.scrollTo({ top: 0, behavior: "instant" as any });
+    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
     setScrollPercent(0);
-  };
+  }, []);
 
   useEffect(() => {
     // Inject custom tactical cursor styled tracker logic when access is granted
@@ -260,27 +274,25 @@ export default function App() {
 
   // Deep Oxblood Crimson (147, 0, 10) to Muted Gold (220, 197, 123) to Polished Platinum (201, 198, 197)
   // Universe Omega: Purple-Violet (89, 42, 122) to Prism Ice (139, 185, 220) to Polished Platinum (197, 201, 203)
-  const getInterpolatedColor = (pct: number) => {
+  const depthColor = useMemo(() => {
     const startColor = paradoxMode ? { r: 89, g: 42, b: 122 } : { r: 147, g: 0, b: 10 };
     const midColor = paradoxMode ? { r: 139, g: 185, b: 220 } : { r: 220, g: 197, b: 123 };
     const endColor = { r: 201, g: 198, b: 197 };
 
-    if (pct < 50) {
-      const t = pct / 50;
+    if (scrollPercent < 50) {
+      const t = scrollPercent / 50;
       const r = Math.round(startColor.r * (1 - t) + midColor.r * t);
       const g = Math.round(startColor.g * (1 - t) + midColor.g * t);
       const b = Math.round(startColor.b * (1 - t) + midColor.b * t);
       return `rgb(${r}, ${g}, ${b})`;
     } else {
-      const t = (pct - 50) / 50;
+      const t = (scrollPercent - 50) / 50;
       const r = Math.round(midColor.r * (1 - t) + endColor.r * t);
       const g = Math.round(midColor.g * (1 - t) + endColor.g * t);
       const b = Math.round(midColor.b * (1 - t) + endColor.b * t);
       return `rgb(${r}, ${g}, ${b})`;
     }
-  };
-
-  const depthColor = getInterpolatedColor(scrollPercent);
+  }, [scrollPercent, paradoxMode]);
 
   return (
     <div className="min-h-screen bg-[#020202] text-white font-sans overflow-x-hidden selection:bg-[#93000a]/30 selection:text-white custom-aiming-reticle relative">
@@ -420,30 +432,16 @@ export default function App() {
                 }}
               />
 
-              {[
-                { id: "home", num: "01", label: "HOME (Manifesto)", sectionId: "section-home" },
-                { id: "listen", num: "02", label: "LISTEN (Frequencies)", sectionId: "section-listen" },
-                { id: "vault", num: "03", label: "VAULT (Live Catalog)", sectionId: "section-vault" },
-                { id: "artifacts", num: "04", label: "ARTIFACTS (Uniforms)", sectionId: "section-artifacts" },
-                { id: "lore", num: "05", label: "LORE (Mythology)", sectionId: "section-lore" },
-                { id: "community", num: "06", label: "COMMUNITY (Believers)", sectionId: "section-community" }
-              ].map((item, idx) => {
+              {NAV_TABS.map((item) => {
                 const isActive = activeTab === item.id;
+                const sectionId = SECTION_SELECTORS[item.id];
                 return (
                   <Tooltip key={item.id} message={`SYS_NAV: Coordinate jump to ${item.num} // ${item.label}`}>
                     <button
-                      onClick={() => scrollToSection(item.sectionId)}
+                      onClick={() => scrollToSection(sectionId)}
                       onMouseEnter={() => {
-                        const messages: {[key: string]: string} = {
-                          home: "🛡️ [GATEWAY] Live biometric trace aligned... Main Atrium credentials set to Sovereign level.",
-                          listen: "🎵 [FREQUENCY] Buffers engaged. Active list of sound channels ready. Checking hardware synth.",
-                          vault: "🗄️ [VAULT] Tracking streams: 395 SoundCloud believers, 5.77K Audiomack manifests secured.",
-                          artifacts: "👕 [ITEMS] Artifact drop inventory: ARMORED LS (25 total units), CIPHER VEST (custom geometry).",
-                          lore: "📖 [THEOLOGY] Parsing character god-complex briefs and Miami roots archive timeline.",
-                          community: "👥 [BELIEVERS] Accessing VIP email registry, live social outlets, FAQs, and event schedules."
-                        };
-                        window.dispatchEvent(new CustomEvent("telemetry-log", { 
-                          detail: { message: messages[item.id], type: item.id === "artifacts" || item.id === "listen" ? "FORGE_SYNC" : "SYSTEM" } 
+                        window.dispatchEvent(new CustomEvent("telemetry-log", {
+                          detail: { message: item.diag, type: item.diagType }
                         }));
                       }}
                       aria-label={`Scroll to ${item.label}`}
@@ -451,12 +449,12 @@ export default function App() {
                     >
                       {/* Left hovering expansion bubble */}
                       <div className="absolute right-8 px-3 py-1 border border-[#c6b89e]/30 bg-black/95 text-white text-[8px] font-mono tracking-[3px] uppercase opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none whitespace-nowrap translate-x-1.5 group-hover:translate-x-0 shadow-lg">
-                        {item.num} // {item.label} {isActive ? "[ ACTIVE ]" : ""}
+                        {item.num} // {item.label} (Manifesto) {isActive ? "[ ACTIVE ]" : ""}
                       </div>
 
                       <div className="w-4 h-4 flex items-center justify-center relative">
                         {/* Glow indicator line */}
-                        <div 
+                        <div
                           className="absolute w-3 h-3 border transition-all duration-300 scale-50 group-hover:scale-100 rotate-45"
                           style={{
                             borderColor: isActive ? depthColor : "rgba(198, 184, 158, 0.4)",
@@ -465,7 +463,7 @@ export default function App() {
                           }}
                         />
                         {/* Status core dot */}
-                        <div 
+                        <div
                           className="w-1 h-1 rounded-full transition-all duration-300"
                           style={{
                             backgroundColor: isActive ? depthColor : "rgba(198, 184, 158, 0.7)",
@@ -565,22 +563,15 @@ export default function App() {
                   </button>
                 </Tooltip>
 
-                {[
-                  { id: "home", label: "HOME", hover: "MANIFESTO", diag: "🛡️ [GATEWAY] Live biometric trace aligned... Main Atrium credentials set to Sovereign level." },
-                  { id: "listen", label: "LISTEN", hover: "FREQUENCY", diag: "🎵 [FREQUENCY] Buffers engaged. Active list of sound channels ready. Checking hardware synth." },
-                  { id: "vault", label: "VAULT", hover: "CATALOG", diag: "🗄️ [VAULT] Tracking streams: 395 SoundCloud believers, 5.77K Audiomack manifests secured." },
-                  { id: "artifacts", label: "ARTIFACTS", hover: "UNIFORMS", diag: "👕 [ITEMS] Artifact drop inventory: ARMORED LS (25 total units), CIPHER VEST (custom geometry)." },
-                  { id: "lore", label: "LORE", hover: "MYTHOLOGY", diag: "📖 [THEOLOGY] Parsing character god-complex briefs and Miami roots archive timeline." },
-                  { id: "community", label: "COMMUNITY", hover: "BELIEVERS", diag: "👥 [BELIEVERS] Accessing VIP email registry, live social outlets, FAQs, and event schedules." },
-                ].map((tab, idx) => (
+                {NAV_TABS.map((tab, idx) => (
                   <motion.button
                     key={tab.id}
                     onClick={() => {
                       scrollToSection(`section-${tab.id}`);
                     }}
                     onMouseEnter={() => {
-                      window.dispatchEvent(new CustomEvent("telemetry-log", { 
-                        detail: { message: tab.diag, type: tab.id === "artifacts" || tab.id === "listen" ? "FORGE_SYNC" : "SYSTEM" } 
+                      window.dispatchEvent(new CustomEvent("telemetry-log", {
+                        detail: { message: tab.diag, type: tab.diagType }
                       }));
                     }}
                     aria-label={`Navigate to ${tab.label}`}
@@ -687,26 +678,19 @@ export default function App() {
                   </div>
 
                   <div className="relative z-10 flex flex-col gap-5">
-                    {[
-                      { id: "home", label: "01 HOME", hover: "THE ARCHIVE", diag: "🛡️ [GATEWAY] Mobile login registered." },
-                      { id: "listen", label: "02 LISTEN", hover: "STREAM MUSIC", diag: "🎵 [FREQUENCY] Buffering soundtrack." },
-                      { id: "vault", label: "03 VAULT", hover: "LOGS", diag: "🗄️ [VAULT] Historical releases synced." },
-                      { id: "artifacts", label: "04 ARTIFACTS", hover: "BUY CLOTHING", diag: "👕 [ITEMS] Secure mobile store active." },
-                      { id: "lore", label: "05 LORE", hover: "STORY", diag: "📖 [THEOLOGY] Reading Miami/Aegean biography." },
-                      { id: "community", label: "06 COMMUNITY", hover: "BELIEVERS", diag: "👥 [BELIEVERS] Accessing VIP email registry, live social outlets, FAQs, and event schedules." },
-                    ].map((tab, idx) => (
+                    {NAV_TABS.map((tab, idx) => (
                       <button
                         key={tab.id}
                         onClick={() => {
                           scrollToSection(`section-${tab.id}`);
                           setMobileMenuOpen(false);
-                          window.dispatchEvent(new CustomEvent("telemetry-log", { 
-                            detail: { message: tab.diag, type: tab.id === "artifacts" || tab.id === "listen" ? "FORGE_SYNC" : "SYSTEM" } 
+                          window.dispatchEvent(new CustomEvent("telemetry-log", {
+                            detail: { message: tab.diag, type: tab.diagType }
                           }));
                         }}
                         className="text-left font-mono text-[10px] tracking-[6px] text-white/70 hover:text-[#c6b89e] transition-colors py-4 border-b border-white/5 flex justify-between items-center relative focus:outline-none"
                       >
-                        <span>{tab.label}</span>
+                        <span>{tab.num} {tab.label}</span>
                         <span className="text-[8px] opacity-30">0{idx + 1}</span>
                       </button>
                     ))}
