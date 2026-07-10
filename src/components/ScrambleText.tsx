@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 interface ScrambleTextProps {
   text: string;
@@ -27,21 +27,21 @@ export default function ScrambleText({
   const [isAnimating, setIsAnimating] = useState(false);
   const triggerCount = useRef(0);
 
-  const startAnimation = () => {
+  const startAnimation = useCallback(() => {
     setIsAnimating(true);
     triggerCount.current += 1;
     const currentTrigger = triggerCount.current;
-    
+
     let startTime: number | null = null;
-    
+
     const animate = (timestamp: number) => {
       if (triggerCount.current !== currentTrigger) return;
       if (!startTime) startTime = timestamp;
-      
+
       const elapsed = timestamp - startTime;
       const progress = Math.min(elapsed / duration, 1);
       const revealIndex = Math.floor(progress * displayText.length);
-      
+
       let result = "";
       for (let i = 0; i < displayText.length; i++) {
         if (i < revealIndex) {
@@ -52,9 +52,9 @@ export default function ScrambleText({
           result += CHARS[Math.floor(Math.random() * CHARS.length)];
         }
       }
-      
+
       setCurrentText(result);
-      
+
       if (progress < 1) {
         requestAnimationFrame(animate);
       } else {
@@ -62,17 +62,17 @@ export default function ScrambleText({
         setIsAnimating(false);
       }
     };
-    
+
     requestAnimationFrame(animate);
-  };
+  }, [displayText, duration]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       startAnimation();
     }, delay);
-    
+
     return () => clearTimeout(timer);
-  }, [text, hoverText, delay]);
+  }, [startAnimation, delay]);
 
   const handleMouseEnter = () => {
     if (triggerOnHover && !isAnimating) {

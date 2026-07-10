@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Terminal, Shield, RefreshCw, AlertTriangle, CornerDownRight, ShieldCheck, Cpu } from "lucide-react";
+import { Terminal, CornerDownRight, ShieldCheck, Cpu } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 export interface TelemetryLogEntry {
@@ -13,6 +13,24 @@ export interface TelemetryLogEntry {
   hex: string;
   message: string;
   type: "SYSTEM" | "HOVER_DIAGNOSTIC" | "USER_INPUT" | "CAMERA_RAW" | "WARNING" | "FORGE_SYNC";
+}
+
+function getLogTypeColor(type: TelemetryLogEntry["type"]): string {
+  switch (type) {
+    case "SYSTEM":
+      return "text-[#c6b89e] font-bold";
+    case "CAMERA_RAW":
+      return "text-cyan-400 font-bold";
+    case "WARNING":
+      return "text-[#93000a] font-bold animate-pulse";
+    case "USER_INPUT":
+      return "text-amber-400";
+    case "FORGE_SYNC":
+      return "text-emerald-400 font-bold";
+    case "HOVER_DIAGNOSTIC":
+    default:
+      return "text-white/60";
+  }
 }
 
 export default function TelemetryTerminal() {
@@ -149,24 +167,6 @@ export default function TelemetryTerminal() {
         type: "SYSTEM"
       }
     ]);
-  };
-
-  const getLogTypeColor = (type: TelemetryLogEntry["type"]) => {
-    switch (type) {
-      case "SYSTEM":
-        return "text-[#c6b89e] font-bold";
-      case "CAMERA_RAW":
-        return "text-cyan-400 font-bold";
-      case "WARNING":
-        return "text-[#93000a] font-bold animate-pulse";
-      case "USER_INPUT":
-        return "text-amber-400";
-      case "FORGE_SYNC":
-        return "text-emerald-400 font-bold";
-      case "HOVER_DIAGNOSTIC":
-      default:
-        return "text-white/60";
-    }
   };
 
   return (
